@@ -1,12 +1,13 @@
 # Uno Sample Code for Quectel Modem
 
-這個專案目前提供一個 Arduino 範例，用來讀取 Quectel 通訊模組透過 UART 回傳的 AT command 訊息。現階段程式碼刻意保持簡單，重點放在穩定接收 modem 回應、分行解析資料，以及建立後續 AT command 範例系列的基礎。
+這個專案目前提供一組 Arduino 範例，用來示範 Quectel 通訊模組的 UART 接收、AT command 發送與回覆解析。現階段程式碼刻意保持簡單，重點放在穩定接收 modem 回應、分行解析資料，以及建立後續 AT command 範例系列的基礎。
 
 ## 目前內容
 
 | 檔案 | 說明 |
 | --- | --- |
-| `SimpleReadModem.ino` | 透過 UART 接收 modem 回應，使用 ring buffer 暫存資料，並依 CR/LF 分行輸出至 debug console。 |
+| `SimpleReadModem/SimpleReadModem.ino` | 透過 UART 接收 modem 回應，使用 ring buffer 暫存資料，並依 CR/LF 分行輸出至 debug console。 |
+| `SimpleModemATcmdLoop/SimpleModemATcmdLoop.ino` | 每秒輪流送出 AT command list 中的一筆命令，並輸出 modem 回覆、結果碼與 timeout。 |
 | `docs/PROJECT_PLAN.md` | 未來範例系列、文件架構、測試方向與 Quectel AT command skill 的規劃。 |
 
 ## 支援板子與序列埠
@@ -31,9 +32,23 @@
 - 避免在主循環中長時間阻塞，保留未來加入狀態機與 timeout 檢查的空間。
 - 在 line buffer 過長時輸出前 16 bytes 的 HEX 資訊，方便初步偵錯。
 
+## 範例列表
+
+### SimpleReadModem
+
+`SimpleReadModem` 是最小接收範例，只負責從 Quectel modem UART 讀取資料、放入 ring buffer、依 CR/LF 切成單行，再輸出到 debug console。這個範例適合用來確認硬體接線、baud rate、電源與 modem 是否有正常吐出 response 或 URC。
+
+詳細流程請見 [SimpleReadModem/README.md](SimpleReadModem/README.md)。
+
+### SimpleModemATcmdLoop
+
+`SimpleModemATcmdLoop` 在接收解析基礎上加入 AT command list。程式每秒從清單中取出一筆命令送給 modem，依序輪流執行 `AT`、`ATI`、`AT+CPIN?`，並等待 `OK`、`ERROR`、`+CME ERROR`、`+CMS ERROR` 或 timeout。這個範例適合用來驗證基本 AT command 發送流程，並作為後續 command queue 或狀態機的起點。
+
+詳細流程請見 [SimpleModemATcmdLoop/README.md](SimpleModemATcmdLoop/README.md)。
+
 ## 快速開始
 
-1. 使用 Arduino IDE 或 Arduino CLI 開啟 `SimpleReadModem.ino`。
+1. 使用 Arduino IDE 或 Arduino CLI 開啟其中一個 sketch 目錄，例如 `SimpleReadModem/SimpleReadModem.ino`。
 2. 確認板子類型與編譯巨集符合目標硬體。
 3. 將 Quectel modem 的 UART TX/RX/GND 接至對應腳位。
 4. 確認 modem UART baud rate，必要時修改：
