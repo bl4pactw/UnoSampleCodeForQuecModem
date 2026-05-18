@@ -18,6 +18,10 @@
 | `ARDUINO_UNO_Q` | `Serial1` | `Monitor` |
 | `ARDUINO_ARCH_AVR` | `SoftwareSerial` on RX 12 / TX 13 | `Serial` |
 
+在傳統 Arduino UNO / AVR 開發板上，硬體 UART `Serial` 通常已經和板上的 USB serial 轉換晶片連接，用來負責程式上傳與電腦端 debug console。如果直接把同一組硬體 UART 接到 Quectel 模組，容易造成上傳、監看 log、modem 通訊互相干擾。
+
+因此本範例在 `ARDUINO_ARCH_AVR` 環境下採用 `SoftwareSerial` library，預設使用 pin 12 作為 RX、pin 13 作為 TX 連接 Quectel 模組，並保留硬體 `Serial` 給 USB debug 使用。
+
 > 請依實際接線、板子與 modem baud rate 調整程式中的 UART 設定。
 
 ## 範例功能
