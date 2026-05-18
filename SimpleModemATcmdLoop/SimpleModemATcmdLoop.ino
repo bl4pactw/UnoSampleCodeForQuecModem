@@ -24,6 +24,13 @@ static const uint16_t   LINE_SIZE = 256;
 static char             lineBuf[LINE_SIZE];
 static uint16_t         lineLen = 0;
 
+static const uint32_t   ATCMD_INTERVAL_MS = 1000;
+static const uint32_t   ATCMD_TIMEOUT_MS = 500;
+static uint32_t         lastAtCmdMs = 0;
+static uint32_t         atCmdSentMs = 0;
+static uint32_t         atCmdSeq = 0;
+static bool             waitingAtCmdRsp = false;
+
 // push one byte into ring buffer
 bool ringBufPush(uint8_t c) 
 {
@@ -59,7 +66,37 @@ void uartRxTask()
       dbgSerial.println(F("[RB] overflow"));
     }
   }
-  
+
+}
+
+void uartTxTask()
+{
+  uint32_t now = millis();
+
+  if (waitingAtCmdRsp) {
+    if ((uint32_t)(now - atCmdSentMs) >= ATCMD_TIMEOUT_MS) {
+      dbgSerial.print(F("[ATCMD][TIMEOUT #"));
+      dbgSerial.print(atCmdSeq);
+      dbgSerial.println(F("] no final response"));
+      waitingAtCmdRsp = false;
+      lastAtCmdMs = now;
+    }
+    return;
+  }
+
+  if ((uint32_t)(now - lastAtCmdMs) < ATCMD_INTERVAL_MS) {
+    return;
+  }
+
+  atCmdSeq++;
+  dbgSerial.print(F("[ATCMD][TX #"));
+  dbgSerial.print(atCmdSeq);
+  dbgSerial.println(F("] AT"));
+
+  mySerial.println(F("AT"));
+  atCmdSentMs = now;
+  lastAtCmdMs = now;
+  waitingAtCmdRsp = true;
 }
 
 // parse bytes from ring buffer into line buffer
@@ -68,6 +105,7 @@ String lineParserTask()
   uint8_t c;
 
   while (ringBufPop(&c)) {
+    
     if (c == '\r') {
       continue;
     }
@@ -99,8 +137,34 @@ String lineParserTask()
       dbgSerial.println();
       lineLen = 0;      
     }
-  }
+
+  } /* end of while (ringBufPop(&c)) */
   return "";
+}
+
+void modemRspTask(const String &atrsp)
+{
+  if (atrsp.length() == 0) {
+    return;
+  }
+
+  dbgSerial.print(F("[MODEM] "));
+  dbgSerial.println(atrsp);
+
+  if (!waitingAtCmdRsp) {
+    return;
+  }
+
+  if ((atrsp == "OK") ||
+      (atrsp == "ERROR") ||
+      atrsp.startsWith("+CME ERROR") ||
+      atrsp.startsWith("+CMS ERROR")) {
+    dbgSerial.print(F("[ATCMD][RESULT #"));
+    dbgSerial.print(atCmdSeq);
+    dbgSerial.print(F("] "));
+    dbgSerial.println(atrsp);
+    waitingAtCmdRsp = false;
+  }
 }
 
 void setup() 
@@ -112,13 +176,12 @@ void setup()
 void loop() 
 {
   String atrsp = "";
-  uartRxTask();      // 持續收 UART
+
+  uartRxTask();          // 持續收 UART
+  uartTxTask();          // 每秒送出一個 AT command，並做 timeout 檢查
   atrsp = lineParserTask();  // 做行分段解析
+  modemRspTask(atrsp);       // 印出 modem 回覆並判斷 AT command 結果
 
   // 這裡可以放其他非阻塞工作
   // 例如狀態機、LED heartbeat、timeout 檢查等
-  if (atrsp.length() > 0) {
-    dbgSerial.print(F("[MODEM] "));
-    dbgSerial.println(atrsp);
-  }
 }
