@@ -25,11 +25,20 @@ static char             lineBuf[LINE_SIZE];
 static uint16_t         lineLen = 0;
 
 static const uint32_t   ATCMD_INTERVAL_MS = 1000;
-static const uint32_t   ATCMD_TIMEOUT_MS = 500;
+static const uint32_t   ATCMD_TIMEOUT_MS = 1000;
 static uint32_t         lastAtCmdMs = 0;
 static uint32_t         atCmdSentMs = 0;
 static uint32_t         atCmdSeq = 0;
+static uint16_t         atCmdIndex = 0;
 static bool             waitingAtCmdRsp = false;
+static const char*      currentAtCmd = NULL;
+
+static const char* const atCmdLst[] = {
+  "AT",
+  "ATI",
+  "AT+CPIN?",
+};
+static const uint16_t   ATCMD_COUNT = sizeof(atCmdLst) / sizeof(atCmdLst[0]);
 
 // push one byte into ring buffer
 bool ringBufPush(uint8_t c) 
@@ -77,25 +86,39 @@ void uartTxTask()
     if ((uint32_t)(now - atCmdSentMs) >= ATCMD_TIMEOUT_MS) {
       dbgSerial.print(F("[ATCMD][TIMEOUT #"));
       dbgSerial.print(atCmdSeq);
-      dbgSerial.println(F("] no final response"));
+      dbgSerial.print(F("] "));
+      dbgSerial.print(currentAtCmd);
+      dbgSerial.println(F(" no final response"));
       waitingAtCmdRsp = false;
       lastAtCmdMs = now;
+      currentAtCmd = NULL;
     }
     return;
   }
 
-  if ((uint32_t)(now - lastAtCmdMs) < ATCMD_INTERVAL_MS) {
+  if ((ATCMD_COUNT == 0) ||
+      ((uint32_t)(now - lastAtCmdMs) < ATCMD_INTERVAL_MS)) {
+    return;
+  }
+
+  const char* cmd = atCmdLst[atCmdIndex];
+  atCmdIndex = (atCmdIndex + 1) % ATCMD_COUNT;
+
+  if ((cmd == NULL) || (cmd[0] == '\0')) {
+    lastAtCmdMs = now;
     return;
   }
 
   atCmdSeq++;
   dbgSerial.print(F("[ATCMD][TX #"));
   dbgSerial.print(atCmdSeq);
-  dbgSerial.println(F("] AT"));
+  dbgSerial.print(F("] "));
+  dbgSerial.println(cmd);
 
-  mySerial.println(F("AT"));
+  mySerial.println(cmd);
   atCmdSentMs = now;
   lastAtCmdMs = now;
+  currentAtCmd = cmd;
   waitingAtCmdRsp = true;
 }
 
@@ -162,8 +185,11 @@ void modemRspTask(const String &atrsp)
     dbgSerial.print(F("[ATCMD][RESULT #"));
     dbgSerial.print(atCmdSeq);
     dbgSerial.print(F("] "));
+    dbgSerial.print(currentAtCmd);
+    dbgSerial.print(F(" -> "));
     dbgSerial.println(atrsp);
     waitingAtCmdRsp = false;
+    currentAtCmd = NULL;
   }
 }
 
