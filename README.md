@@ -1,6 +1,6 @@
 # Uno Sample Code for Quectel Modem
 
-這個專案目前提供一組 Arduino 範例，用來示範 Quectel 通訊模組的 UART 接收、AT command 發送與回覆解析。現階段程式碼刻意保持簡單，重點放在穩定接收 modem 回應、分行解析資料，以及建立後續 AT command 範例系列的基礎。
+這個專案目前提供一組 Arduino 範例，用來示範 Quectel 通訊模組的 UART 接收、AT command 發送、回覆解析、URC 分流，以及基礎 cellular networking 狀態機。範例刻意從簡單到進階排列，方便先確認硬體通訊，再逐步加入 command runner、timeout/retry 與連網流程。
 
 ## 目前內容
 
@@ -9,6 +9,7 @@
 | `SimpleReadModem/SimpleReadModem.ino` | 透過 UART 接收 modem 回應，使用 ring buffer 暫存資料，並依 CR/LF 分行輸出至 debug console。 |
 | `SimpleModemInteractive/SimpleModemInteractive.ino` | 從 monitor console 手動輸入 AT command 並送給 modem，同時顯示 response 與 URC。 |
 | `SimpleModemATcmdLoop/SimpleModemATcmdLoop.ino` | 每秒輪流送出 AT command list 中的一筆命令，並輸出 modem 回覆、結果碼與 timeout。 |
+| `SimpleModemNetworking/SimpleModemNetworking.ino` | 使用非阻塞 cellular 狀態機管理 Quectel BC66 類 NB-IoT 模組的 SIM、註冊、PDP 與 network ready 流程。 |
 | `docs/PROJECT_PLAN.md` | 未來範例系列、文件架構、測試方向與 Quectel AT command skill 的規劃。 |
 
 ## 支援板子與序列埠
@@ -26,11 +27,22 @@
 
 > 請依實際接線、板子與 modem baud rate 調整程式中的 UART 設定。
 
-## 範例功能
+## 目前範例狀態
+
+| 範例 | 狀態 | 重點能力 | 適合用途 |
+| --- | --- | --- | --- |
+| `SimpleReadModem` | 基礎完成 | UART ring buffer、CR/LF line parser、modem log 輸出 | 第一次確認接線、baud rate、modem 是否有輸出。 |
+| `SimpleModemInteractive` | 基礎完成 | monitor console 輸入、手動 AT command、常見 URC 標示 | 人工探索 AT command、收集 response/URC log。 |
+| `SimpleModemATcmdLoop` | 基礎完成 | command list 輪詢、final result 判斷、timeout | 驗證自動送出 AT command 與簡單回覆流程。 |
+| `SimpleModemNetworking` | 雛形完成 | cellular 狀態機、command runner、timeout/retry、URC router、PDP 啟用 | 驗證 BC66 類 NB-IoT 模組的基本連網流程。 |
+
+目前各範例共用的設計方向：
 
 - 使用固定大小 ring buffer 接收 UART byte stream。
 - 將 modem 回應依 `\r\n` 分行解析。
-- 避免在主循環中長時間阻塞，保留未來加入狀態機與 timeout 檢查的空間。
+- 盡量維持非阻塞 loop，讓後續狀態機、timeout 與 retry 可以穩定運作。
+- 使用 `OK`、`ERROR`、`+CME ERROR`、`+CMS ERROR` 判斷 AT command final result。
+- 逐步分離 command response 與 URC，避免非同步訊息干擾目前正在等待的 command。
 - 在 line buffer 過長時輸出前 16 bytes 的 HEX 資訊，方便初步偵錯。
 
 ## 範例列表
@@ -53,23 +65,52 @@
 
 詳細流程請見 [SimpleModemATcmdLoop/README.md](SimpleModemATcmdLoop/README.md)。
 
+### SimpleModemNetworking
+
+`SimpleModemNetworking` 進一步加入 cellular networking manager，示範如何用非阻塞狀態機完成 `AT` 同步、`ATE0`、`AT+CMEE=2`、模組資訊查詢、SIM 檢查、訊號查詢、EPS registration、PDP context 設定、packet attach、PDP activation 與 IP 查詢。這個範例目前以 Quectel BC66 類 NB-IoT 模組流程為主要參考，networking management 相關 AT command 仍需依模組系列、SIM 卡、營運商、APN、註冊型態與實際網路環境調整。
+
+詳細流程請見 [SimpleModemNetworking/README.md](SimpleModemNetworking/README.md)。
+
 ## 快速開始
 
 1. 使用 Arduino IDE 或 Arduino CLI 開啟其中一個 sketch 目錄，例如 `SimpleReadModem/SimpleReadModem.ino`。
 2. 確認板子類型與編譯巨集符合目標硬體。
 3. 將 Quectel modem 的 UART TX/RX/GND 接至對應腳位。
-4. 確認 modem UART baud rate，必要時修改：
+4. 依目標選擇範例：
+
+| 目標 | 建議範例 |
+| --- | --- |
+| 只確認 modem 有沒有吐資料 | `SimpleReadModem` |
+| 手動輸入 AT command 測試 | `SimpleModemInteractive` |
+| 自動輪詢少量 AT command | `SimpleModemATcmdLoop` |
+| 跑 SIM、註冊與 PDP 連網流程 | `SimpleModemNetworking` |
+
+5. 確認 modem UART baud rate，必要時修改：
 
 ```cpp
 mySerial.begin(115200);
 ```
 
-5. 上傳程式後開啟 debug console，觀察輸出格式：
+部分較新的範例使用常數設定：
+
+```cpp
+static const uint32_t MODEM_BAUDRATE = 115200;
+```
+
+6. 上傳程式後開啟 debug console，觀察輸出格式：
 
 ```text
 [MODEM] OK
 [MODEM] +CSQ: 20,99
 ```
+
+若使用 `SimpleModemNetworking`，請先依 SIM 卡與營運商修改 APN：
+
+```cpp
+static const char PDP_APN[] = "internet";
+```
+
+`SimpleModemNetworking` 中的註冊、attach、PDP activation 與 IP 查詢流程是目前的基礎範例，不代表所有 Quectel 模組或所有營運商都能直接套用。實作前請對照目標模組的 AT Command Manual，調整 network registration、PDP context、packet service 與 socket/data service 相關命令。
 
 ## 建議的下一步
 
@@ -80,6 +121,7 @@ mySerial.begin(115200);
 - PDP context 與資料連線：`+CGDCONT`、`+CGATT`、`+QIACT`
 - TCP/UDP/MQTT/HTTP 應用
 - GNSS、SMS、低功耗、韌體版本查詢與錯誤診斷
+- 將目前重複的 ring buffer、line parser、command runner 與 URC router 抽成共用 library
 
 詳細規劃請見 [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md)。
 
