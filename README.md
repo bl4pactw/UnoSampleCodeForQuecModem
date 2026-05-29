@@ -127,7 +127,7 @@ static const char PDP_APN[] = "internet";
 
 ## Quectel AT Command Skill 建議
 
-建議未來建立一個專門的 Codex skill，用來沉澱 Quectel AT command 的開發知識。這個 skill 可以協助使用者：
+建議未來建立一個專門的 Codex skill，用來累積 Quectel AT command 知識。這個 skill 可以協助使用者：
 
 - 根據模組型號與應用情境選擇正確 AT command 流程。
 - 產生 Arduino / MCU 端的非阻塞狀態機範例。
