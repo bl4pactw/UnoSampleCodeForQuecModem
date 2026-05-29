@@ -7,6 +7,7 @@
 | 檔案 | 說明 |
 | --- | --- |
 | `SimpleReadModem/SimpleReadModem.ino` | 透過 UART 接收 modem 回應，使用 ring buffer 暫存資料，並依 CR/LF 分行輸出至 debug console。 |
+| `SimpleModemInteractive/SimpleModemInteractive.ino` | 從 monitor console 手動輸入 AT command 並送給 modem，同時顯示 response 與 URC。 |
 | `SimpleModemATcmdLoop/SimpleModemATcmdLoop.ino` | 每秒輪流送出 AT command list 中的一筆命令，並輸出 modem 回覆、結果碼與 timeout。 |
 | `docs/PROJECT_PLAN.md` | 未來範例系列、文件架構、測試方向與 Quectel AT command skill 的規劃。 |
 
@@ -39,6 +40,12 @@
 `SimpleReadModem` 是最小接收範例，只負責從 Quectel modem UART 讀取資料、放入 ring buffer、依 CR/LF 切成單行，再輸出到 debug console。這個範例適合用來確認硬體接線、baud rate、電源與 modem 是否有正常吐出 response 或 URC。
 
 詳細流程請見 [SimpleReadModem/README.md](SimpleReadModem/README.md)。
+
+### SimpleModemInteractive
+
+`SimpleModemInteractive` 從 `SimpleReadModem` 衍生，加入 monitor console 輸入功能。使用者可以手動輸入 `AT`、`ATI`、`AT+CPIN?` 等命令，程式會補上 CR/LF 後送給 modem，並持續顯示 modem response 與常見 URC。這個範例適合用來人工探索 AT command、收集 modem log、驗證後續狀態機流程。
+
+詳細流程請見 [SimpleModemInteractive/README.md](SimpleModemInteractive/README.md)。
 
 ### SimpleModemATcmdLoop
 
