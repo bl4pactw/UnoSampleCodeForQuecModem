@@ -1,4 +1,4 @@
-# Uno Sample Code for Quectel Modem
+# Arduino Uno Sample Code for Quectel Modem
 
 這個專案目前提供一組 Arduino 範例，用來示範 Quectel 通訊模組的 UART 接收、AT command 發送、回覆解析、URC 分流，以及基礎 cellular networking 狀態機。範例刻意從簡單到進階排列，方便先確認硬體通訊，再逐步加入 command runner、timeout/retry 與連網流程。
 
